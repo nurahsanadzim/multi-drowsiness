@@ -1,0 +1,8 @@
+# .vscode
+.vscode/
+
+# audio
+*.wav
+
+# dat file
+*.dat
