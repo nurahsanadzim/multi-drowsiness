@@ -225,8 +225,6 @@ while True:
 		e2 = cv2.getTickCount()
 		print((e2 - e1)/cv2.getTickFrequency())
 
-		# tambahkan exec time per deteksi ke index wajah saat ini
-		face_list[face_count]
 		# naikkan counter untuk deteksi selanjutnya
 		face_count += 1
 
