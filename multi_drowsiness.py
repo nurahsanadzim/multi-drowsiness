@@ -44,6 +44,12 @@ def mouth_aspect_ratio(mouth):
 	# return the mouth aspect ratio
 	return mar
 
+# fungsi untuk menginput exec time ke queue
+def input_time(time_list, sec):
+  if time_list.full():
+    time_list.get()
+  time_list.put(sec)
+
 # class Face:
 # 	def __init__(self, consec_frame, exec_time):
 # 		self.consec_frame = consec_frame
@@ -60,7 +66,7 @@ args = vars(ap.parse_args())
 # blink and then a second constant for the number of consecutive
 # frames the eye must be below the threshold for to set off the
 # alarm
-EYE_AR_THRESH = 0.5
+EYE_AR_THRESH = 0.4
 EYE_AR_CONSEC_FRAMES = 48
 
 # define one constants, for mouth aspect ratio to indicate open mouth
@@ -133,14 +139,9 @@ while True:
 		except IndexError:
 			face_list.append({
 				'consec_frame': 0,
-				'exec_time': []
+				'exec_time': queue.Queue(maxsize=48)
 			})
 
-		# if not face_list[face_count]:
-		# 	face_list.append({
-		# 		'consec_frame': 0,
-		# 		'exec_time': []
-		# 	})
 
 		# determine the facial landmarks for the face region, then
 		# convert the facial landmark (x, y)-coordinates to a NumPy
@@ -155,19 +156,8 @@ while True:
 		leftEAR = eye_aspect_ratio(leftEye)
 		rightEAR = eye_aspect_ratio(rightEye)
 
-		# extract the mouth coordinates, then use the
-		# coordinates to compute the mouth aspect ratio
-		mouth = shape[mStart:mEnd]
-
 		# average the eye aspect ratio together for both eyes
 		ear = (leftEAR + rightEAR) / 2.0
-
-		# compute the convex hull for the left and right eye, then
-		# visualize each of the eyes
-		leftEyeHull = cv2.convexHull(leftEye)
-		rightEyeHull = cv2.convexHull(rightEye)
-		cv2.drawContours(frame, [leftEyeHull], -1, (0, 255, 0), 1)
-		cv2.drawContours(frame, [rightEyeHull], -1, (0, 255, 0), 1)
 
 		# check to see if the eye aspect ratio is below the blink
 		# threshold, and if so, increment the blink frame counter
@@ -176,16 +166,15 @@ while True:
 			# COUNTER += 1
 			# print(COUNTER)
 			face_list[face_count]['consec_frame'] += 1
-			print(face_list[face_count]['consec_frame'])
 
 			# if the eyes were closed for a sufficient number of
 			# then sound the alarm
 			# if COUNTER >= EYE_AR_CONSEC_FRAMES:
 			if face_list[face_count]['consec_frame'] >= EYE_AR_CONSEC_FRAMES:
 
-				# if the alarm is not on, turn qit on
-				if not ALARM_ON:
-					ALARM_ON = True
+				# # if the alarm is not on, turn qit on
+				# if not ALARM_ON:
+				# 	ALARM_ON = True
 
 				# draw an alarm on the frame
 				cv2.putText(frame, "MENGANTUK!", (10, 30),
@@ -194,7 +183,7 @@ while True:
 		# otherwise, the eye aspect ratio is not below the blink
 		# threshold, so reset the counter and alarm
 		else:
-			COUNTER = 0
+			face_list[face_count]['consec_frame'] = 0
 			ALARM_ON = False
 
 		# draw the computed eye aspect ratio on the frame to help
@@ -205,10 +194,20 @@ while True:
 
 		cv2.putText(frame, "EAR: {:.2f}".format(ear), (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-
 		# mycode
 		# cv2.putText(frame, "Wajah: {}".format(face), (0, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
- 
+
+		# extract the mouth coordinates, then use the
+		# coordinates to compute the mouth aspect ratio
+		mouth = shape[mStart:mEnd]
+
+		# compute the convex hull for the left and right eye, then
+		# visualize each of the eyes
+		leftEyeHull = cv2.convexHull(leftEye)
+		rightEyeHull = cv2.convexHull(rightEye)
+		cv2.drawContours(frame, [leftEyeHull], -1, (0, 255, 0), 1)
+		cv2.drawContours(frame, [rightEyeHull], -1, (0, 255, 0), 1)
+
 		mouthMAR = mouth_aspect_ratio(mouth)
 		mar = mouthMAR
 		# compute the convex hull for the mouth, then
@@ -223,10 +222,19 @@ while True:
 			cv2.putText(frame, "Mouth is Open!", (30,60),
 			cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255),2)
 		e2 = cv2.getTickCount()
-		print((e2 - e1)/cv2.getTickFrequency())
+		# print((e2 - e1)/cv2.getTickFrequency())
 
+		# print(type(face_list[face_list]['exec_time']))
+		if face_list[face_count]['exec_time'].full():
+			face_list[face_count]['exec_time'].get()
+		face_list[face_count]['exec_time'].put((e2 - e1)/cv2.getTickFrequency())			
+		# input_time(, (e2 - e1)/cv2.getTickFrequency())
+		
+		print(face_list[face_count]['exec_time'].queue)
 		# naikkan counter untuk deteksi selanjutnya
 		face_count += 1
+
+	print(face_list)
 
 	# show the frame
 	cv2.imshow("Frame", frame)
