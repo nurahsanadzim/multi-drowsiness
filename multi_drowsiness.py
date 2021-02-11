@@ -1,4 +1,5 @@
 # import the necessary packages
+import queue
 from scipy.spatial import distance as dist
 from imutils.video import VideoStream, FPS
 from imutils import face_utils
@@ -43,6 +44,11 @@ def mouth_aspect_ratio(mouth):
 	# return the mouth aspect ratio
 	return mar
 
+# class Face:
+# 	def __init__(self, consec_frame, exec_time):
+# 		self.consec_frame = consec_frame
+# 		self.exec_time = exec_time
+
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-p", "--shape-predictor", required=True, help="path to facial landmark predictor")
@@ -54,7 +60,7 @@ args = vars(ap.parse_args())
 # blink and then a second constant for the number of consecutive
 # frames the eye must be below the threshold for to set off the
 # alarm
-EYE_AR_THRESH = 0.15
+EYE_AR_THRESH = 0.5
 EYE_AR_CONSEC_FRAMES = 48
 
 # define one constants, for mouth aspect ratio to indicate open mouth
@@ -85,6 +91,13 @@ predictor = dlib.shape_predictor(args["shape_predictor"])
 vs = cv2.VideoCapture(args["video"])
 fps = FPS().start()
 
+# face_list = [{
+# 	'consec_frame': 0,
+# 	'exec_time': []
+# }]
+
+face_list = []
+
 # loop over frames from the video stream
 while True:
 	# grab the frame from the threaded video file stream
@@ -107,13 +120,28 @@ while True:
 	# detect faces in the grayscale frame
 	rects = detector(gray, 0)
 
-	# mycode
-	# inisialisasi jumlah deteksi wajah
-	index = 0
+	# inisialisasi jumlah deteksi wajah data dimensi kedua	
+
+	face_count = 0
 
 	# loop over the face detections
 	for rect in rects:
-		index += 1
+		e1 = cv2.getTickCount()
+
+		try:
+			face_list[face_count]
+		except IndexError:
+			face_list.append({
+				'consec_frame': 0,
+				'exec_time': []
+			})
+
+		# if not face_list[face_count]:
+		# 	face_list.append({
+		# 		'consec_frame': 0,
+		# 		'exec_time': []
+		# 	})
+
 		# determine the facial landmarks for the face region, then
 		# convert the facial landmark (x, y)-coordinates to a NumPy
 		# array
@@ -144,12 +172,18 @@ while True:
 		# check to see if the eye aspect ratio is below the blink
 		# threshold, and if so, increment the blink frame counter
 		if ear < EYE_AR_THRESH:
-			COUNTER += 1
+
+			# COUNTER += 1
+			# print(COUNTER)
+			face_list[face_count]['consec_frame'] += 1
+			print(face_list[face_count]['consec_frame'])
 
 			# if the eyes were closed for a sufficient number of
 			# then sound the alarm
-			if COUNTER >= EYE_AR_CONSEC_FRAMES:
-				# if the alarm is not on, turn it on
+			# if COUNTER >= EYE_AR_CONSEC_FRAMES:
+			if face_list[face_count]['consec_frame'] >= EYE_AR_CONSEC_FRAMES:
+
+				# if the alarm is not on, turn qit on
 				if not ALARM_ON:
 					ALARM_ON = True
 
@@ -166,11 +200,14 @@ while True:
 		# draw the computed eye aspect ratio on the frame to help
 		# with debugging and setting the correct eye aspect ratio
 		# thresholds and frame counters
-		# cv2.putText(frame, "EAR: {:.2f}: pada wajah {}".format(ear, index), (0, 30*index),
+		# cv2.putText(frame, "EAR: {:.2f}: pada wajah {}".format(ear, face_count), (0, 30*face_count),
 		# 	cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
+		cv2.putText(frame, "EAR: {:.2f}".format(ear), (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+
 		# mycode
-		# cv2.putText(frame, "Wajah: {}".format(index), (0, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
+		# cv2.putText(frame, "Wajah: {}".format(face), (0, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
  
 		mouthMAR = mouth_aspect_ratio(mouth)
 		mar = mouthMAR
@@ -179,17 +216,26 @@ while True:
 		mouthHull = cv2.convexHull(mouth)
 		
 		cv2.drawContours(frame, [mouthHull], -1, (0, 255, 0), 1)
-		cv2.putText(frame, "MAR: {:.2f}".format(mar), (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+		# cv2.putText(frame, "MAR: {:.2f}".format(mar), (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
 		# Draw text if mouth is open
 		if mar > MOUTH_AR_THRESH:
 			cv2.putText(frame, "Mouth is Open!", (30,60),
 			cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255),2)
+		e2 = cv2.getTickCount()
+		print((e2 - e1)/cv2.getTickFrequency())
+
+		# tambahkan exec time per deteksi ke index wajah saat ini
+		face_list[face_count]
+		# naikkan counter untuk deteksi selanjutnya
+		face_count += 1
 
 	# show the frame
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
 	fps.update()
+
+	# print(face_list)
 
 	# if the `q` key was pressed, break from the loop
 	if key == ord("q"):
@@ -202,8 +248,7 @@ print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
 
 # do a bit of cleanup
 cv2.destroyAllWindows()
-vs.stop()
+vs.release()
 
 # run the code
-# py multi_drowsiness.py --shape-predictor shape_predictor_68_face_landmarks.dat
 # py multi_drowsiness.py --shape-predictor shape_predictor_68_face_landmarks.dat --video 10.MOV
