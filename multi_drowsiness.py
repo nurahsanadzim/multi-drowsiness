@@ -66,7 +66,7 @@ args = vars(ap.parse_args())
 # blink and then a second constant for the number of consecutive
 # frames the eye must be below the threshold for to set off the
 # alarm
-EYE_AR_THRESH = 0.4
+EYE_AR_THRESH = 0.15
 EYE_AR_CONSEC_FRAMES = 48
 
 # define one constants, for mouth aspect ratio to indicate open mouth
@@ -118,8 +118,8 @@ while True:
 	# channels)
 	_, frame = vs.read()
 	(w, h, c) = frame.shape
-	#syntax: cv2.resize(img, (width, height))
-	frame = cv2.resize(frame,(400, h))
+	# syntax: cv2.resize(img, (width, height))
+	frame = cv2.resize(frame,(300, 500))
 
 	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -139,7 +139,7 @@ while True:
 		except IndexError:
 			face_list.append({
 				'consec_frame': 0,
-				'exec_time': queue.Queue(maxsize=48)
+				'exec_time': queue.Queue(maxsize=30)
 			})
 
 
@@ -171,14 +171,14 @@ while True:
 			# then sound the alarm
 			# if COUNTER >= EYE_AR_CONSEC_FRAMES:
 			if face_list[face_count]['consec_frame'] >= EYE_AR_CONSEC_FRAMES:
-
+				print("wajah ke {} mengantuk dari EAR".format(face_count))
 				# # if the alarm is not on, turn qit on
 				# if not ALARM_ON:
 				# 	ALARM_ON = True
 
 				# draw an alarm on the frame
-				cv2.putText(frame, "MENGANTUK!", (10, 30),
-					cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+				# cv2.putText(frame, "MENGANTUK!", (10, 30),
+				# 	cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
 		# otherwise, the eye aspect ratio is not below the blink
 		# threshold, so reset the counter and alarm
@@ -219,8 +219,9 @@ while True:
 
 		# Draw text if mouth is open
 		if mar > MOUTH_AR_THRESH:
-			cv2.putText(frame, "Mouth is Open!", (30,60),
-			cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255),2)
+			# cv2.putText(frame, "Mouth is Open!", (30,60),
+			# cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255),2)
+			print("wajah ke {} mengantuk dari MAR".format(face_count))
 		e2 = cv2.getTickCount()
 		# print((e2 - e1)/cv2.getTickFrequency())
 
@@ -230,11 +231,11 @@ while True:
 		face_list[face_count]['exec_time'].put((e2 - e1)/cv2.getTickFrequency())			
 		# input_time(, (e2 - e1)/cv2.getTickFrequency())
 		
-		print(face_list[face_count]['exec_time'].queue)
+		# print(face_list[face_count]['exec_time'].queue)
 		# naikkan counter untuk deteksi selanjutnya
 		face_count += 1
 
-	print(face_list)
+	# print(face_list)
 
 	# show the frame
 	cv2.imshow("Frame", frame)
