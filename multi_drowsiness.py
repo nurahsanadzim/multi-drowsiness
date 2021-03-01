@@ -83,8 +83,13 @@ fps = FPS().start()
 
 face_list = []
 
+debug_count = 0
 # loop over frames from the video stream
 while True:
+
+	if debug_count != 0:
+		break
+
 	# grab the frame from the threaded video file stream
 	(grabbed, frame) = vs.read()
 	
@@ -97,16 +102,22 @@ while True:
 
 	# detect faces in the grayscale frame
 	rects = detector(gray, 0)
-
-	# index untuk pemisah setiap objek wajah yang terdeteksi
-	face_count = 0
+		# index untuk pemisah setiap objek wajah yang terdeteksi
+	# face_count = 0
 
 	# loop over the face detections
-	for rect in rects:
-		
+	for (i, rect) in enumerate(rects):
+		# (x, y, w, h) = face_utils.rect_to_bb(rect)
+		# print("{}, {}, {}, {}".format(x, y, w, h))
+		print(rect.tl_corner())
+		print(rect.tr_corner())
+		print(rect.bl_corner())
+		print(rect.br_corner())
+		print("----------")
+
 		# cek jika list wajah belum ada sama sekali
 		try:
-			face_list[face_count]
+			face_list[i]
 		except IndexError:
 			face_list.append({
 				'consec_frame': 0,
@@ -139,24 +150,26 @@ while True:
 		if ear < EYE_AR_THRESH:
 
 			# naikkan consec_frame jika EAR melewati nilai ambang
-			face_list[face_count]['consec_frame'] += 1
+			face_list[i]['consec_frame'] += 1
 
 			# if the eyes were closed for a sufficient number of
 			# then sound the alarm
 			# if COUNTER >= EYE_AR_CONSEC_FRAMES:
-			if face_list[face_count]['consec_frame'] >= EYE_AR_CONSEC_FRAMES:
-				print("wajah ke {} mengantuk dari EAR".format(face_count))
+			if face_list[i]['consec_frame'] >= EYE_AR_CONSEC_FRAMES:
+				print("wajah ke {} mengantuk dari EAR".format(i))
 				# simpan waktu eksekusi
 		
 		# otherwise, the eye aspect ratio is not below the blink
 		# threshold, so reset the counter
 		else:
-			face_list[face_count]['consec_frame'] = 0
+			face_list[i]['consec_frame'] = 0
 
 		# selesai hitung waktu eksekusi EAR
 		e2 = cv2.getTickCount()
 
-		cv2.putText(frame, "EAR: {:.2f}".format(ear), (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+		(x, y, w, h) = face_utils.rect_to_bb(rect)
+		cv2.putText(frame, "Face #{}".format(i + 1), (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+		# cv2.putText(frame, "EAR: {:.2f}".format(ear), (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
 		# mulai hitung waktu eksekusi untuk MAR
 		e3 = cv2.getTickCount()
@@ -185,21 +198,20 @@ while True:
 
 		# Draw text if mouth is open
 		if mar > MOUTH_AR_THRESH:
-			print("wajah ke {} mengantuk dari MAR".format(face_count))
+			print("wajah ke {} mengantuk dari MAR".format(i))
 		
 		# selesai hitung waktu eksekusi MAR
 		e4 = cv2.getTickCount()
 
 		# input waktu eksekusi EAR
-		if face_list[face_count]['ear_time'].full():
-			face_list[face_count]['ear_time'].get()
-		face_list[face_count]['ear_time'].put((e2 - e1)/cv2.getTickFrequency())
+		if face_list[i]['ear_time'].full():
+			face_list[i]['ear_time'].get()
+		face_list[i]['ear_time'].put((e2 - e1)/cv2.getTickFrequency())
 
 		# input waktu eksekusi MAR
-		face_list[face_count]['mar_time'] = e4 - e3 / cv2.getTickFrequency()
-		
-		# naikkan counter untuk deteksi selanjutnya
-		face_count += 1
+		face_list[i]['mar_time'] = e4 - e3 / cv2.getTickFrequency()
+
+	debug_count += 1
 
 	# show the frame
 	cv2.imshow("Frame", frame)
