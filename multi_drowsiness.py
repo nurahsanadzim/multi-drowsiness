@@ -83,12 +83,12 @@ fps = FPS().start()
 
 face_list = []
 
-debug_count = 0
+# debug_count = 0
 # loop over frames from the video stream
 while True:
 
-	if debug_count != 0:
-		break
+	# if debug_count != 0:
+	# 	break
 
 	# grab the frame from the threaded video file stream
 	(grabbed, frame) = vs.read()
@@ -107,13 +107,11 @@ while True:
 
 	# loop over the face detections
 	for (i, rect) in enumerate(rects):
-		# (x, y, w, h) = face_utils.rect_to_bb(rect)
-		# print("{}, {}, {}, {}".format(x, y, w, h))
-		print(rect.tl_corner())
-		print(rect.tr_corner())
-		print(rect.bl_corner())
-		print(rect.br_corner())
-		print("----------")
+		# print(rect.tl_corner())
+		# print(rect.tr_corner())
+		# print(rect.bl_corner())
+		# print(rect.br_corner())
+
 
 		# cek jika list wajah belum ada sama sekali
 		try:
@@ -131,6 +129,9 @@ while True:
 		# array
 		shape = predictor(gray, rect)
 		shape = face_utils.shape_to_np(shape)
+		# print(shape[67])
+		# print("----------")
+
 
 		# mulai hitung waktu eksekusi untuk EAR
 		e1 = cv2.getTickCount()
@@ -211,7 +212,7 @@ while True:
 		# input waktu eksekusi MAR
 		face_list[i]['mar_time'] = e4 - e3 / cv2.getTickFrequency()
 
-	debug_count += 1
+	# debug_count += 1
 
 	# show the frame
 	cv2.imshow("Frame", frame)

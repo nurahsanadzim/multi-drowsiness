@@ -4,6 +4,7 @@
 # video file
 *.mp4
 *.MOV
+*.mpeg
 
 # dat file
 *.dat
