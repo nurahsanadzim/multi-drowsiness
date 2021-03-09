@@ -9,6 +9,7 @@ import imutils
 import time
 import dlib
 import cv2
+from pyimagesearch.centroidtracker import CentroidTracker
 
 
 def eye_aspect_ratio(eye):
@@ -45,11 +46,11 @@ def mouth_aspect_ratio(mouth):
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
-ap.add_argument("-p", "--shape-predictor", required=True, help="path to facial landmark predictor")
-ap.add_argument("-w", "--webcam", type=int, default=0, help="index of webcam on system")
 ap.add_argument("-v", "--video", required=True, help="path to input video file")
 args = vars(ap.parse_args())
- 
+
+ct = CentroidTracker()
+
 # define two constants, one for the eye aspect ratio to indicate
 # blink and then a second constant for the number of consecutive
 # frames the eye must be below the threshold for to set off the alarm
@@ -67,7 +68,7 @@ COUNTER = 0
 # the facial landmark predictor
 print("[INFO] loading facial landmark predictor...")
 detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor(args["shape_predictor"])
+predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
 
 # grab the indexes of the facial landmarks for the left and
 # right eye, respectively
@@ -102,16 +103,11 @@ while True:
 
 	# detect faces in the grayscale frame
 	rects = detector(gray, 0)
-		# index untuk pemisah setiap objek wajah yang terdeteksi
-	# face_count = 0
+
+	list_box = []
 
 	# loop over the face detections
 	for (i, rect) in enumerate(rects):
-		# print(rect.tl_corner())
-		# print(rect.tr_corner())
-		# print(rect.bl_corner())
-		# print(rect.br_corner())
-
 
 		# cek jika list wajah belum ada sama sekali
 		try:
@@ -123,6 +119,13 @@ while True:
 				'mar_time': 0
 			})
 
+		# input bounding box setiap deteksi
+		startX = rect.left()
+		startY = rect.top()
+		endX = rect.right()
+		endY = rect.bottom()
+		cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 1)
+		list_box.append([startX, startY, endX, endY])
 
 		# determine the facial landmarks for the face region, then
 		# convert the facial landmark (x, y)-coordinates to a NumPy
@@ -185,6 +188,7 @@ while True:
 		rightEyeHull = cv2.convexHull(rightEye)
 		cv2.drawContours(frame, [leftEyeHull], -1, (0, 255, 0), 1)
 		cv2.drawContours(frame, [rightEyeHull], -1, (0, 255, 0), 1)
+		
 
 		# hitung MAR
 		mouthMAR = mouth_aspect_ratio(mouth)
@@ -204,6 +208,11 @@ while True:
 		# selesai hitung waktu eksekusi MAR
 		e4 = cv2.getTickCount()
 
+		# print(rect.area())
+
+		# cv2.rectangle(frame, rect[0], rect[1],
+		# 		(0, 255, 0), 2)
+
 		# input waktu eksekusi EAR
 		if face_list[i]['ear_time'].full():
 			face_list[i]['ear_time'].get()
@@ -212,7 +221,16 @@ while True:
 		# input waktu eksekusi MAR
 		face_list[i]['mar_time'] = e4 - e3 / cv2.getTickFrequency()
 
-	# debug_count += 1
+	objects = ct.update(list_box)
+	# loop over the tracked objects
+	
+	for (objectID, centroid) in objects.items():
+		# draw both the ID of the object and the centroid of the
+		# object on the output frame
+		text = "ID {}".format(objectID)
+		cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),
+			cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+		cv2.circle(frame, (centroid[0], centroid[1]), 4, (0, 255, 0), -1)
 
 	# show the frame
 	cv2.imshow("Frame", frame)
@@ -233,4 +251,4 @@ cv2.destroyAllWindows()
 vs.release()
 
 # run the code
-# py multi_drowsiness.py --shape-predictor shape_predictor_68_face_landmarks.dat --video <path>
+# py multi_drowsiness.py --video <path>

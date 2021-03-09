@@ -8,3 +8,9 @@
 
 # dat file
 *.dat
+
+# screenshot
+testing_screenshot/
+
+# pyc
+*.pyc
