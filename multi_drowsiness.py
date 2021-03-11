@@ -85,8 +85,11 @@ fps = FPS().start()
 face_list = []
 
 # debug_count = 0
+
 # loop over frames from the video stream
 while True:
+	# mulai hitung waktu eksekusi setiap frame
+	e1 = cv2.getTickCount()
 
 	# if debug_count != 0:
 	# 	break
@@ -104,40 +107,75 @@ while True:
 	# detect faces in the grayscale frame
 	rects = detector(gray, 0)
 
-	list_box = []
+	# print(rects)
 
+	unordered_rects = []
+
+	for rect in rects:
+		(x, y, w, h) = face_utils.rect_to_bb(rect)
+		# input bounding box setiap deteksi
+		startX = rect.left()
+		startY = rect.top()
+		endX = rect.right()
+		endY = rect.bottom()
+		cX = int((startX + endX) / 2.0)
+		cY = int((startY + endY) / 2.0)
+
+		unordered_rects.append([startX, startY, endX, endY, [cX, cY]])
+
+		cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 1)
+		# cX = int((x + (x+w)) / 2.0)
+		# cY = int((y + (y+h)) / 2.0)
+		# print(cX, cY)
+
+	objects_ordered = ct.update(unordered_rects)
+	# print(unordered_rects)
+	ordered_rects = []
+
+	for (objectID, centroid) in objects_ordered.items():
+		
+	# urutkan rects
+	# for o in objects_ordered.items():
+		for u in unordered_rects:
+			if centroid[0] == u[4][0] and centroid[1] == u[4][1]:
+				rect = dlib.rectangle(u[0], u[1], u[2], u[3])
+				ordered_rects.append(rect)
+				# print(rect)
+				# print('----')
+
+
+		# draw both the ID of the object and the centroid of the
+		# object on the output frame
+		text = "ID {}".format(objectID)
+		cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),
+			cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+		cv2.circle(frame, (centroid[0], centroid[1]), 4, (0, 255, 0), -1)
+
+
+	# print(ordered_rects)
+	# print('----')
 	# loop over the face detections
-	for (i, rect) in enumerate(rects):
-
+	for (i, rect) in enumerate(ordered_rects):
+		# print(i)
 		# cek jika list wajah belum ada sama sekali
 		try:
 			face_list[i]
 		except IndexError:
 			face_list.append({
 				'consec_frame': 0,
-				'ear_time': queue.Queue(maxsize=30),
-				'mar_time': 0
 			})
 
-		# input bounding box setiap deteksi
-		startX = rect.left()
-		startY = rect.top()
-		endX = rect.right()
-		endY = rect.bottom()
-		cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 1)
-		list_box.append([startX, startY, endX, endY])
 
 		# determine the facial landmarks for the face region, then
 		# convert the facial landmark (x, y)-coordinates to a NumPy
 		# array
+		# print(rect)
+		# print(rect.tl_corner())
+		# print(rect.br_corner())
+
 		shape = predictor(gray, rect)
 		shape = face_utils.shape_to_np(shape)
-		# print(shape[67])
-		# print("----------")
 
-
-		# mulai hitung waktu eksekusi untuk EAR
-		e1 = cv2.getTickCount()
 
 		# extract the left and right eye coordinates, then use the
 		# coordinates to compute the eye aspect ratio for both eyes
@@ -168,15 +206,10 @@ while True:
 		else:
 			face_list[i]['consec_frame'] = 0
 
-		# selesai hitung waktu eksekusi EAR
-		e2 = cv2.getTickCount()
 
 		(x, y, w, h) = face_utils.rect_to_bb(rect)
-		cv2.putText(frame, "Face #{}".format(i + 1), (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+		cv2.putText(frame, 'face #{}'.format(i), (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 		# cv2.putText(frame, "EAR: {:.2f}".format(ear), (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-		# mulai hitung waktu eksekusi untuk MAR
-		e3 = cv2.getTickCount()
 
 		# extract the mouth coordinates, then use the
 		# coordinates to compute the mouth aspect ratio
@@ -188,7 +221,6 @@ while True:
 		rightEyeHull = cv2.convexHull(rightEye)
 		cv2.drawContours(frame, [leftEyeHull], -1, (0, 255, 0), 1)
 		cv2.drawContours(frame, [rightEyeHull], -1, (0, 255, 0), 1)
-		
 
 		# hitung MAR
 		mouthMAR = mouth_aspect_ratio(mouth)
@@ -204,43 +236,36 @@ while True:
 		# Draw text if mouth is open
 		if mar > MOUTH_AR_THRESH:
 			print("wajah ke {} mengantuk dari MAR".format(i))
-		
-		# selesai hitung waktu eksekusi MAR
-		e4 = cv2.getTickCount()
 
-		# print(rect.area())
-
-		# cv2.rectangle(frame, rect[0], rect[1],
-		# 		(0, 255, 0), 2)
+		# selesai hitung waktu eksekusi frame
+		e2 = cv2.getTickCount()
 
 		# input waktu eksekusi EAR
-		if face_list[i]['ear_time'].full():
-			face_list[i]['ear_time'].get()
-		face_list[i]['ear_time'].put((e2 - e1)/cv2.getTickFrequency())
+		# if face_list[i]['ear_time'].full():
+		# 	face_list[i]['ear_time'].get()
+		# face_list[i]['ear_time'].put((e2 - e1)/cv2.getTickFrequency())
 
 		# input waktu eksekusi MAR
-		face_list[i]['mar_time'] = e4 - e3 / cv2.getTickFrequency()
+		# face_list[i]['mar_time'] = e4 - e3 / cv2.getTickFrequency()
 
-	objects = ct.update(list_box)
-	# loop over the tracked objects
 	
-	for (objectID, centroid) in objects.items():
-		# draw both the ID of the object and the centroid of the
-		# object on the output frame
-		text = "ID {}".format(objectID)
-		cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),
-			cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-		cv2.circle(frame, (centroid[0], centroid[1]), 4, (0, 255, 0), -1)
+	# print(objects)
+	# loop over the tracked objects
+
+	# print(objects)
+	# debug_count += 1
 
 	# show the frame
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
 	fps.update()
 
+	# print('------------------')
+
 	# if the `q` key was pressed, break from the loop
 	if key == ord("q"):
 		break
-
+	exec_time = (e2 - e1)/cv2.getTickFrequency()
 # stop the timer and display FPS information
 fps.stop()
 print("[INFO] elasped time: {:.2f}".format(fps.elapsed()))
