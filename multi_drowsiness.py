@@ -29,19 +29,17 @@ def eye_aspect_ratio(eye):
 	return ear
 
 def mouth_aspect_ratio(mouth):
-	# compute the euclidean distances between the two sets of
-	# vertical mouth landmarks (x, y)-coordinates
+	# vertical sets
 	A = dist.euclidean(mouth[2], mouth[10]) # 51, 59
 	B = dist.euclidean(mouth[4], mouth[8]) # 53, 57
+	C = dist.euclidean(mouth[3], mouth[9]) # 52, 58
 
-	# compute the euclidean distance between the horizontal
-	# mouth landmark (x, y)-coordinates
-	C = dist.euclidean(mouth[0], mouth[6]) # 49, 55
+	# horizontal set
+	D = dist.euclidean(mouth[0], mouth[6]) # 49, 55
 
-	# compute the mouth aspect ratio
-	mar = (A + B) / (2.0 * C)
+	# hitung mouth aspect ratio
+	mar = (A + B + C) / (3.0 * D)
 
-	# return the mouth aspect ratio
 	return mar
 
 # construct the argument parse and parse the arguments
@@ -49,6 +47,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video", required=True, help="path to input video file")
 args = vars(ap.parse_args())
 
+# pelacak centroid
 ct = CentroidTracker()
 
 # define two constants, one for the eye aspect ratio to indicate
@@ -83,6 +82,7 @@ vs = cv2.VideoCapture(args["video"])
 fps = FPS().start()
 
 face_list = []
+exec_time_30_frame = queue.Queue(maxsize=30)
 
 # debug_count = 0
 
@@ -124,9 +124,6 @@ while True:
 		unordered_rects.append([startX, startY, endX, endY, [cX, cY]])
 
 		cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 1)
-		# cX = int((x + (x+w)) / 2.0)
-		# cY = int((y + (y+h)) / 2.0)
-		# print(cX, cY)
 
 	objects_ordered = ct.update(unordered_rects)
 	# print(unordered_rects)
@@ -237,35 +234,25 @@ while True:
 		if mar > MOUTH_AR_THRESH:
 			print("wajah ke {} mengantuk dari MAR".format(i))
 
-		# selesai hitung waktu eksekusi frame
-		e2 = cv2.getTickCount()
-
-		# input waktu eksekusi EAR
-		# if face_list[i]['ear_time'].full():
-		# 	face_list[i]['ear_time'].get()
-		# face_list[i]['ear_time'].put((e2 - e1)/cv2.getTickFrequency())
-
-		# input waktu eksekusi MAR
-		# face_list[i]['mar_time'] = e4 - e3 / cv2.getTickFrequency()
-
-	
-	# print(objects)
-	# loop over the tracked objects
-
-	# print(objects)
-	# debug_count += 1
-
 	# show the frame
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
 	fps.update()
 
-	# print('------------------')
+	# selesai hitung waktu eksekusi frame
+	e2 = cv2.getTickCount()
+
+	exec_time = (e2 - e1)/cv2.getTickFrequency()
+	
+	if exec_time_30_frame.full():
+		exec_time_30_frame.get()
+	exec_time_30_frame.put(exec_time)
 
 	# if the `q` key was pressed, break from the loop
 	if key == ord("q"):
+		# print(len(exec_time_30_frame.queue))
 		break
-	exec_time = (e2 - e1)/cv2.getTickFrequency()
+
 # stop the timer and display FPS information
 fps.stop()
 print("[INFO] elasped time: {:.2f}".format(fps.elapsed()))

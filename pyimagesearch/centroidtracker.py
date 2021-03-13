@@ -55,10 +55,7 @@ class CentroidTracker():
 
 		# loop over the bounding box rectangles
 		for (i, (startX, startY, endX, endY, ct)) in enumerate(rects):
-			# use the bounding box coordinates to derive the centroid
-			cX = int((startX + endX) / 2.0)
-			cY = int((startY + endY) / 2.0)
-			inputCentroids[i] = (cX, cY)
+			inputCentroids[i] = (ct[0], ct[1])
 
 		# if we are currently not tracking any objects take the input
 		# centroids and register each of them
