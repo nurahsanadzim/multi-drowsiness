@@ -12,5 +12,8 @@
 # screenshot
 testing_screenshot/
 
+# python cache folder
+__pycache__/
+
 # pyc
 *.pyc

@@ -9,6 +9,8 @@ import imutils
 import time
 import dlib
 import cv2
+import pandas as pd
+from datetime import datetime
 from pyimagesearch.centroidtracker import CentroidTracker
 
 
@@ -84,7 +86,7 @@ fps = FPS().start()
 face_list = []
 exec_time_30_frame = queue.Queue(maxsize=30)
 
-# debug_count = 0
+exec_time_list = []
 
 # loop over frames from the video stream
 while True:
@@ -99,6 +101,9 @@ while True:
 	
 	# if the frame was not grabbed, then we have reached the end of the stream
 	if not grabbed:
+		to_csv_file = pd.DataFrame(exec_time_list)
+		now = datetime.now().strftime("%d-%m-%Y-%H-%M%S")
+		to_csv_file.to_csv('C:\\Users\\ahsan\\{}.csv'.format(now))
 		break
 
 	# konversi frame ke grayscale
@@ -195,8 +200,21 @@ while True:
 			# then sound the alarm
 			# if COUNTER >= EYE_AR_CONSEC_FRAMES:
 			if face_list[i]['consec_frame'] >= EYE_AR_CONSEC_FRAMES:
+
+				ear_e2 = cv2.getTickCount()
+				ear_last_frame_exec_time = (ear_e2 - e1)/cv2.getTickFrequency()
+	
+				if exec_time_30_frame.full():
+					exec_time_30_frame.get()
+				exec_time_30_frame.put(ear_last_frame_exec_time)
+
 				print("wajah ke {} mengantuk dari EAR".format(i))
+				
 				# simpan waktu eksekusi
+				exec_time_list.append({
+					'detector': 'ear',
+					'time': exec_time_30_frame.queue
+				})
 		
 		# otherwise, the eye aspect ratio is not below the blink
 		# threshold, so reset the counter
@@ -232,7 +250,16 @@ while True:
 
 		# Draw text if mouth is open
 		if mar > MOUTH_AR_THRESH:
+			mar_e2 = cv2.getTickCount()
+			mar_exec_time = (mar_e2 - e1)/cv2.getTickFrequency()
+
 			print("wajah ke {} mengantuk dari MAR".format(i))
+
+			# simpan waktu eksekusi
+			exec_time_list.append({
+				'detector': 'mar',
+				'time': mar_exec_time
+			})
 
 	# show the frame
 	cv2.imshow("Frame", frame)
@@ -250,7 +277,9 @@ while True:
 
 	# if the `q` key was pressed, break from the loop
 	if key == ord("q"):
-		# print(len(exec_time_30_frame.queue))
+		to_csv_file = pd.DataFrame(exec_time_list)
+		now = datetime.now().strftime("%d-%m-%Y-%H-%M%S")
+		to_csv_file.to_csv('C:\\Users\\ahsan\\{}.csv'.format(now))
 		break
 
 # stop the timer and display FPS information
