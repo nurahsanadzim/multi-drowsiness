@@ -9,8 +9,9 @@
 # dat file
 *.dat
 
-# screenshot
+# other folder
 testing_screenshot/
+to_used/
 
 # python cache folder
 __pycache__/
