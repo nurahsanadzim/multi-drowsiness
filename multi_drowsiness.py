@@ -10,7 +10,6 @@ import cv2
 import pandas as pd
 from datetime import datetime
 from pyimagesearch.centroidtracker import CentroidTracker
-# import time
 
 
 def eye_aspect_ratio(eye):
@@ -37,12 +36,17 @@ def generate_csv(list_time):
 	now = datetime.now().strftime("%d-%m-%Y-%H-%M%S")
 	to_csv_file.to_csv('C:\\Users\\ahsan\\Documents\\res\\{}.csv'.format(now))
 
+def millis_convert(millis):
+	minutes = int((millis/(1000*60))%60)
+	seconds = int((millis/1000)%60)
+	return '{}:{}'.format(minutes, seconds)
+
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video",required=True, help="path to input video file")
 args = vars(ap.parse_args())
 
 ct = CentroidTracker()
-EYE_AR_THRESH = 0.16
+EYE_AR_THRESH = 0.25
 EYE_AR_CONSEC_FRAMES = 30
 MOUTH_AR_THRESH = 0.83
 
@@ -55,27 +59,25 @@ predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
 (mStart, mEnd) = (49, 68)
 
 vs = cv2.VideoCapture(args["video"])
-
-# stream video
-# vs = VideoStream(src=0).start()
-# time.sleep(1.0)
-
 fps = FPS().start()
 
 face_list = []
 exec_time_30_frame = queue.Queue(maxsize=30)
 exec_time_list = []
 
-while True:
-	e1 = cv2.getTickCount()
+vs_time = 0
 
-	# video stream
-	# frame = vs.read()
+while True:
+	# waktu video (miliseconds)
+	vs_time = int(vs.get(cv2.CAP_PROP_POS_MSEC))
+
+	e1 = cv2.getTickCount()
 
 	(grabbed, frame) = vs.read()
 	
 	# if the frame was not grabbed, then we have reached the end of the stream
 	if not grabbed:
+		print(vs_time)
 		# generate_csv(exec_time_list)
 		break
 
@@ -139,7 +141,7 @@ while True:
 
 		(x, y, w, h) = face_utils.rect_to_bb(rect)
 		cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 1)
-		cv2.putText(frame, 'ID#{} EAR: {:.2f} MAR: {:.2f}'.format(i, ear, mar), (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+		cv2.putText(frame, 'ID{} EAR:{:.2f} MAR:{:.2f}'.format(i, ear, mar), (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
 		if ear < EYE_AR_THRESH:
 
@@ -148,6 +150,9 @@ while True:
 
 			# terdeteksi mengantuk pada EAR
 			if face_list[i]['consec_frame'] >= EYE_AR_CONSEC_FRAMES:
+				# alert
+				cv2.putText(frame, '(EAR)Mengantuk!', (x - 10, y - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
 				ear_e2 = cv2.getTickCount()
 				ear_last_frame_exec_time = (ear_e2 - e1)/cv2.getTickFrequency()
 	
@@ -156,29 +161,32 @@ while True:
 				exec_time_30_frame.put(ear_last_frame_exec_time)
 				
 				exec_time_list.append({
+					'timestamp': millis_convert(vs_time)
 					'detector': 'ear',
 					'time': exec_time_30_frame.queue
 				})
 
-				# alert
-				cv2.putText(frame, '(EAR)Mengantuk!', (x - 10, y - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+				print('id {}, (ear)mengantuk'.format(i))
 
 		else:
 			face_list[i]['consec_frame'] = 0
 
 		if mar > MOUTH_AR_THRESH:
+			# alert
+			cv2.putText(frame, '(MAR)Mengantuk!', (x - 10, y - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
 			mar_e2 = cv2.getTickCount()
 			mar_exec_time = (mar_e2 - e1)/cv2.getTickFrequency()
 
 			exec_time_list.append({
+				'timestamp': millis_convert(vs_time)
 				'detector': 'mar',
 				'time': mar_exec_time
 			})
 
-			# alert
-			cv2.putText(frame, '(MAR)Mengantuk!', (x - 10, y - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+			print('id {}, (mar)mengantuk'.format(i))
 
-	cv2.imshow("Frame", frame)
+	cv2.imshow("Deteksi Kantuk", frame)
 	key = cv2.waitKey(1) & 0xFF
 	fps.update()
 
@@ -193,6 +201,7 @@ while True:
 	exec_time_30_frame.put(exec_time)
 
 	if key == ord("q"):
+		print(vs_time)
 		# generate_csv(exec_time_list)
 		break
 
