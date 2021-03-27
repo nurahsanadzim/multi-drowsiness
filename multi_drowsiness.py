@@ -161,9 +161,9 @@ while True:
 				exec_time_30_frame.put(ear_last_frame_exec_time)
 				
 				exec_time_list.append({
-					'timestamp': millis_convert(vs_time)
+					'timestamp': millis_convert(vs_time),
 					'detector': 'ear',
-					'time': exec_time_30_frame.queue
+					'time': list(exec_time_30_frame.queue)
 				})
 
 				print('id {}, (ear)mengantuk'.format(i))
@@ -179,7 +179,7 @@ while True:
 			mar_exec_time = (mar_e2 - e1)/cv2.getTickFrequency()
 
 			exec_time_list.append({
-				'timestamp': millis_convert(vs_time)
+				'timestamp': millis_convert(vs_time),
 				'detector': 'mar',
 				'time': mar_exec_time
 			})
@@ -201,8 +201,8 @@ while True:
 	exec_time_30_frame.put(exec_time)
 
 	if key == ord("q"):
-		print(vs_time)
-		# generate_csv(exec_time_list)
+		# print(millis_convert(vs_time))
+		generate_csv(exec_time_list)
 		break
 
 fps.stop()
