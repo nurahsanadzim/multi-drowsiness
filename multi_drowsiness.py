@@ -33,7 +33,7 @@ def mouth_aspect_ratio(mouth):
 
 def generate_csv(list_time):
 	to_csv_file = pd.DataFrame(list_time)
-	now = datetime.now().strftime("%d-%m-%Y-%H-%M%S")
+	now = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 	to_csv_file.to_csv('C:\\Users\\ahsan\\Documents\\res\\{}.csv'.format(now))
 
 def millis_convert(millis):
@@ -47,7 +47,7 @@ args = vars(ap.parse_args())
 
 ct = CentroidTracker()
 EYE_AR_THRESH = 0.25
-EYE_AR_CONSEC_FRAMES = 30
+EYE_AR_CONSEC_FRAMES = 15
 MOUTH_AR_THRESH = 0.83
 
 print("[INFO] loading facial landmark predictor...")
@@ -62,7 +62,7 @@ vs = cv2.VideoCapture(args["video"])
 fps = FPS().start()
 
 face_list = []
-exec_time_30_frame = queue.Queue(maxsize=30)
+exec_time_30_frame = queue.Queue(maxsize=15)
 exec_time_list = []
 
 vs_time = 0
@@ -75,10 +75,12 @@ while True:
 
 	(grabbed, frame) = vs.read()
 	
+	cv2.putText(frame, millis_convert(vs_time), (0, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
 	# if the frame was not grabbed, then we have reached the end of the stream
 	if not grabbed:
 		print(vs_time)
-		# generate_csv(exec_time_list)
+		generate_csv(exec_time_list)
 		break
 
 	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -162,11 +164,12 @@ while True:
 				
 				exec_time_list.append({
 					'timestamp': millis_convert(vs_time),
+					'id': i,
 					'detector': 'ear',
 					'time': list(exec_time_30_frame.queue)
 				})
 
-				print('id {}, (ear)mengantuk'.format(i))
+				print('{} - ID{} (ear)mengantuk'.format(vs_time, i))
 
 		else:
 			face_list[i]['consec_frame'] = 0
@@ -180,11 +183,12 @@ while True:
 
 			exec_time_list.append({
 				'timestamp': millis_convert(vs_time),
+				'id': i,
 				'detector': 'mar',
 				'time': mar_exec_time
 			})
 
-			print('id {}, (mar)mengantuk'.format(i))
+			print('{} - ID{} (mar)mengantuk'.format(vs_time, i))
 
 	cv2.imshow("Deteksi Kantuk", frame)
 	key = cv2.waitKey(1) & 0xFF
@@ -202,7 +206,7 @@ while True:
 
 	if key == ord("q"):
 		# print(millis_convert(vs_time))
-		generate_csv(exec_time_list)
+		# generate_csv(exec_time_list)
 		break
 
 fps.stop()
