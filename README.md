@@ -1,2 +1,1 @@
-# multi_drowsiness
-My Thesis
+My Undergraduate Thesis. Drowsiness detector for multiple person in classroom-like environment.
