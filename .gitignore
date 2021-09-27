@@ -1,8 +1,18 @@
 # .vscode
 .vscode/
 
-# audio
-*.wav
+# video file
+*.mp4
+*.MOV
+*.mpeg
 
 # dat file
 *.dat
+
+# other folder
+
+# python cache folder
+__pycache__/
+
+# pyc
+*.pyc

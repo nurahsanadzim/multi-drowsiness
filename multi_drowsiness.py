@@ -1,212 +1,209 @@
-# USAGE
-# python detect_drowsiness.py --shape-predictor shape_predictor_68_face_landmarks.dat
-# python detect_drowsiness.py --shape-predictor shape_predictor_68_face_landmarks.dat --alarm alarm.wav
-
-# import the necessary packages
+import queue
 from scipy.spatial import distance as dist
-from imutils.video import VideoStream
+from imutils.video import VideoStream, FPS
 from imutils import face_utils
-from threading import Thread
 import numpy as np
-# import playsound
 import argparse
 import imutils
-import time
 import dlib
 import cv2
+import pandas as pd
+from datetime import datetime
+from pyimagesearch.centroidtracker import CentroidTracker
 
-def sound_alarm(path):
-	# play an alarm sound
-	playsound.playsound(path)
 
 def eye_aspect_ratio(eye):
-	# compute the euclidean distances between the two sets of
-	# vertical eye landmarks (x, y)-coordinates
-	A = dist.euclidean(eye[1], eye[5])
+	A = dist.euclidean(eye[1], eye[5]) 
 	B = dist.euclidean(eye[2], eye[4])
-
-	# compute the euclidean distance between the horizontal
-	# eye landmark (x, y)-coordinates
 	C = dist.euclidean(eye[0], eye[3])
-
-	# compute the eye aspect ratio
 	ear = (A + B) / (2.0 * C)
-
-	# return the eye aspect ratio
 	return ear
 
 def mouth_aspect_ratio(mouth):
-	# compute the euclidean distances between the two sets of
-	# vertical mouth landmarks (x, y)-coordinates
-	A = dist.euclidean(mouth[2], mouth[10]) # 51, 59
-	B = dist.euclidean(mouth[4], mouth[8]) # 53, 57
-
-	# compute the euclidean distance between the horizontal
-	# mouth landmark (x, y)-coordinates
-	C = dist.euclidean(mouth[0], mouth[6]) # 49, 55
-
-	# compute the mouth aspect ratio
-	mar = (A + B) / (2.0 * C)
-
-	# return the mouth aspect ratio
+	A = dist.euclidean(mouth[2], mouth[10])
+	B = dist.euclidean(mouth[4], mouth[8])
+	C = dist.euclidean(mouth[3], mouth[9])
+	D = dist.euclidean(mouth[0], mouth[6])
+	mar = (A + B + C) / (3.0 * D)
 	return mar
 
-# construct the argument parse and parse the arguments
+def generate_csv(list_time):
+	to_csv_file = pd.DataFrame(list_time)
+	now = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+	to_csv_file.to_csv('C:\\Users\\ahsan\\Documents\\res\\{}.csv'.format(now))
+
+def millis_convert(millis):
+	minutes = int((millis/(1000*60))%60)
+	seconds = int((millis/1000)%60)
+	return '{}:{}'.format(minutes, seconds)
+
 ap = argparse.ArgumentParser()
-ap.add_argument("-p", "--shape-predictor", required=True,
-	help="path to facial landmark predictor")
-ap.add_argument("-a", "--alarm", type=str, default="",
-	help="path alarm .WAV file")
-ap.add_argument("-w", "--webcam", type=int, default=0,
-	help="index of webcam on system")
+ap.add_argument("-v", "--video",required=True, help="path to input video file")
 args = vars(ap.parse_args())
- 
-# define two constants, one for the eye aspect ratio to indicate
-# blink and then a second constant for the number of consecutive
-# frames the eye must be below the threshold for to set off the
-# alarm
-EYE_AR_THRESH = 0.3
-EYE_AR_CONSEC_FRAMES = 48
 
+ct = CentroidTracker()
+EYE_AR_THRESH = 0.25
+EYE_AR_CONSEC_FRAMES = 15
+MOUTH_AR_THRESH = 0.83
 
-# define one constants, for mouth aspect ratio to indicate open mouth
-MOUTH_AR_THRESH = 0.79
-
-# initialize the frame counter as well as a boolean used to
-# indicate if the alarm is going off
-COUNTER = 0
-ALARM_ON = False
-
-# initialize dlib's face detector (HOG-based) and then create
-# the facial landmark predictor
 print("[INFO] loading facial landmark predictor...")
 detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor(args["shape_predictor"])
+predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
 
-# grab the indexes of the facial landmarks for the left and
-# right eye, respectively
 (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
 (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
-
-# grab the indexes of the facial landmarks for the mouth
 (mStart, mEnd) = (49, 68)
 
-# start the video stream thread
-print("[INFO] starting video stream thread...")
-vs = VideoStream(src=args["webcam"]).start()
-time.sleep(1.0)
+vs = cv2.VideoCapture(args["video"])
+fps = FPS().start()
 
-# loop over frames from the video stream
+face_list = []
+exec_time_15_frame = queue.Queue(maxsize=15)
+exec_time_list = []
+vs_time = 0
+
 while True:
-	# grab the frame from the threaded video file stream, resize
-	# it, and convert it to grayscale
-	# channels)
-	frame = vs.read()
-	frame = imutils.resize(frame, width=675)
-	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+	vs_time = int(vs.get(cv2.CAP_PROP_POS_MSEC))
 
-	# detect faces in the grayscale frame
-	rects = detector(gray, 0)
+	e1 = cv2.getTickCount()
 
-	# mycode
-	# inisialisasi jumlah deteksi wajah
-	index = 0
+	(grabbed, frame) = vs.read()
+	
+	cv2.putText(frame, millis_convert(vs_time), (0, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-	# loop over the face detections
-	for rect in rects:
-		index += 1
-		# determine the facial landmarks for the face region, then
-		# convert the facial landmark (x, y)-coordinates to a NumPy
-		# array
-		shape = predictor(gray, rect)
-		shape = face_utils.shape_to_np(shape)
-
-		# extract the left and right eye coordinates, then use the
-		# coordinates to compute the eye aspect ratio for both eyes
-		leftEye = shape[lStart:lEnd]
-		rightEye = shape[rStart:rEnd]
-		leftEAR = eye_aspect_ratio(leftEye)
-		rightEAR = eye_aspect_ratio(rightEye)
-
-		# extract the mouth coordinates, then use the
-		# coordinates to compute the mouth aspect ratio
-		mouth = shape[mStart:mEnd]
-
-		# average the eye aspect ratio together for both eyes
-		ear = (leftEAR + rightEAR) / 2.0
-
-		# compute the convex hull for the left and right eye, then
-		# visualize each of the eyes
-		leftEyeHull = cv2.convexHull(leftEye)
-		rightEyeHull = cv2.convexHull(rightEye)
-		cv2.drawContours(frame, [leftEyeHull], -1, (0, 255, 0), 1)
-		cv2.drawContours(frame, [rightEyeHull], -1, (0, 255, 0), 1)
-
-		# check to see if the eye aspect ratio is below the blink
-		# threshold, and if so, increment the blink frame counter
-		if ear < EYE_AR_THRESH:
-			COUNTER += 1
-
-			# if the eyes were closed for a sufficient number of
-			# then sound the alarm
-			if COUNTER >= EYE_AR_CONSEC_FRAMES:
-				# if the alarm is not on, turn it on
-				if not ALARM_ON:
-					ALARM_ON = True
-
-					# check to see if an alarm file was supplied,
-					# and if so, start a thread to have the alarm
-					# sound played in the background
-					# if args["alarm"] != "":
-					# 	t = Thread(target=sound_alarm,
-					# 		args=(args["alarm"],))
-					# 	t.deamon = True
-					# 	t.start()
-
-				# draw an alarm on the frame
-				cv2.putText(frame, "MENGANTUK!", (10, 30),
-					cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-		# otherwise, the eye aspect ratio is not below the blink
-		# threshold, so reset the counter and alarm
-		else:
-			COUNTER = 0
-			ALARM_ON = False
-
-		# draw the computed eye aspect ratio on the frame to help
-		# with debugging and setting the correct eye aspect ratio
-		# thresholds and frame counters
-		cv2.putText(frame, "EAR: {:.2f}: pada wajah {}".format(ear, index), (0, 30*index),
-			cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-		# mycode
-		# cv2.putText(frame, "Wajah: {}".format(index), (0, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255))
- 
-		mouthMAR = mouth_aspect_ratio(mouth)
-		mar = mouthMAR
-		# compute the convex hull for the mouth, then
-		# visualize the mouth
-		mouthHull = cv2.convexHull(mouth)
-		
-		cv2.drawContours(frame, [mouthHull], -1, (0, 255, 0), 1)
-		cv2.putText(frame, "MAR: {:.2f}".format(mar), (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-		# Draw text if mouth is open
-		if mar > MOUTH_AR_THRESH:
-			cv2.putText(frame, "Mouth is Open!", (30,60),
-			cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255),2)
-
-	# show the frame
-	cv2.imshow("Frame", frame)
-	key = cv2.waitKey(1) & 0xFF
- 
-	# if the `q` key was pressed, break from the loop
-	if key == ord("q"):
+	if not grabbed:
+		generate_csv(exec_time_list)
 		break
 
-# do a bit of cleanup
-cv2.destroyAllWindows()
-vs.stop()
+	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+	rects = detector(gray, 0)
+	unordered_rects = []
 
-# run the code
-# python detect_drowsiness.py --shape-predictor multi_predictor_68_face_landmarks.dat --alarm alarm.wav
+	# ambil koordinat bounding box wajah yang terdeteksi
+	for rect in rects:
+		(x, y, w, h) = face_utils.rect_to_bb(rect)
+		# input bounding box dan centroid setiap deteksi
+		startX = rect.left()
+		startY = rect.top()
+		endX = rect.right()
+		endY = rect.bottom()
+		cX = int((startX + endX) / 2.0)
+		cY = int((startY + endY) / 2.0)
+		unordered_rects.append([startX, startY, endX, endY, [cX, cY]])
+
+	# urutkan data berdasarkan objek sebelumnya (metode euclidean distance)
+	objects_ordered = ct.update(unordered_rects)
+
+	# looping setiap objek yang sudah diurutkan
+	for (objectID, centroid) in objects_ordered.items():
+		try:
+			face_list[objectID]
+		except IndexError:
+			face_list.append({
+				'consec_frame': 0,
+			})
+
+		for u in unordered_rects:
+			# urutkan setiap deteksi wajah pada frame saat ini
+			# (data koordinat wajah tersimpan di unordered_rects)
+			if centroid[0] == u[4][0] and centroid[1] == u[4][1]:
+				rect = dlib.rectangle(u[0], u[1], u[2], u[3])
+
+				shape = predictor(gray, rect)
+				shape = face_utils.shape_to_np(shape)
+
+				leftEye = shape[lStart:lEnd]
+				rightEye = shape[rStart:rEnd]
+				leftEAR = eye_aspect_ratio(leftEye)
+				rightEAR = eye_aspect_ratio(rightEye)
+				ear = (leftEAR + rightEAR) / 2.0
+
+				leftEyeHull = cv2.convexHull(leftEye)
+				rightEyeHull = cv2.convexHull(rightEye)
+				cv2.drawContours(frame, [leftEyeHull], -1, (0, 255, 0), 1)
+				cv2.drawContours(frame, [rightEyeHull], -1, (0, 255, 0), 1)
+
+				mouth = shape[mStart:mEnd]
+				mar = mouth_aspect_ratio(mouth)
+
+				mouthHull = cv2.convexHull(mouth)	
+				cv2.drawContours(frame, [mouthHull], -1, (0, 255, 0), 1)
+
+				(x, y, w, h) = face_utils.rect_to_bb(rect)
+				cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 1)
+				cv2.putText(frame, 'E:{:.2f} M:{:.2f}'.format(ear, mar), (x - 10, y - 4), 
+					cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+				cv2.putText(frame, '#{}'.format(objectID), (centroid[0] - 10, centroid[1] - 10),
+					cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+				if ear < EYE_AR_THRESH:
+
+					# naikkan consec_frame jika EAR melewati treshold
+					face_list[objectID]['consec_frame'] += 1
+
+					if face_list[objectID]['consec_frame'] >= EYE_AR_CONSEC_FRAMES:
+						# alert
+						cv2.putText(frame, '(EAR)Mengantuk!', (x - 10, y - 18), cv2.FONT_HERSHEY_SIMPLEX, 
+							0.4, ((0, 0, 255)), 1)
+
+						ear_e2 = cv2.getTickCount()
+						ear_last_frame_exec_time = (ear_e2 - e1)/cv2.getTickFrequency()
+			
+						if exec_time_15_frame.full():
+							exec_time_15_frame.get()
+						exec_time_15_frame.put(ear_last_frame_exec_time)
+						
+						exec_time_list.append({
+							'timestamp': millis_convert(vs_time),
+							'id': objectID,
+							'detector': 'ear',
+							'time': list(exec_time_15_frame.queue)
+						})
+
+				else:
+					face_list[objectID]['consec_frame'] = 0
+
+				if mar > MOUTH_AR_THRESH:
+					# alert
+					cv2.putText(frame, '(MAR)Mengantuk!', (x - 10, y - 18), cv2.FONT_HERSHEY_SIMPLEX, 
+						0.4, (255, 0, 0), 1)
+
+					mar_e2 = cv2.getTickCount()
+					mar_exec_time = (mar_e2 - e1)/cv2.getTickFrequency()
+
+					exec_time_list.append({
+						'timestamp': millis_convert(vs_time),
+						'id': objectID,
+						'detector': 'mar',
+						'time': mar_exec_time
+					})
+
+			else:
+				continue
+
+	cv2.namedWindow('Deteksi Kantuk', cv2.WINDOW_NORMAL) 
+	cv2.imshow('Deteksi Kantuk', frame)
+	key = cv2.waitKey(1) & 0xFF
+	fps.update()
+
+	e2 = cv2.getTickCount()
+	exec_time = (e2 - e1)/cv2.getTickFrequency()
+	
+	# simpan daftar waktu eksekusi 15 frame sebelumnya
+	if exec_time_15_frame.full():
+		exec_time_15_frame.get()
+	exec_time_15_frame.put(exec_time)
+
+	if key == ord("q"):
+		# generate_csv(exec_time_list)
+		break
+
+fps.stop()
+print("[INFO] elasped time: {:.2f}".format(fps.elapsed()))
+print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
+
+cv2.destroyAllWindows()
+vs.release()
+
+# py multi_drowsiness.py -v ../testing/dataset_variation/eight_1080.mp4
+# py multi_drowsiness.py -v ../testing/realtime_variation/eight_person_1080.mp4 
